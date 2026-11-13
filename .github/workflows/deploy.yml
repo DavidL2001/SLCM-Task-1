@@ -1,0 +1,74 @@
+# CI/CD: bygg appen, bygg Docker-imagen och starta en driftsättning på Render.
+# Flödet: push till main → build-jobbet → (bara om det lyckas) deploy-jobbet.
+name: Deploy
+
+on:
+  # Körs automatiskt vid varje push till main.
+  push:
+    branches: [main]
+  # Gör det möjligt att köra workflowen manuellt från fliken Actions.
+  # Deployen körs ändå bara från main (se villkoret i deploy-jobbet).
+  workflow_dispatch:
+
+# Minsta möjliga rättigheter för GITHUB_TOKEN: vi behöver bara läsa koden.
+permissions:
+  contents: read
+
+# Bara en körning åt gången, så att två deployer inte krockar.
+# En pågående körning avbryts inte, den nya får vänta.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Bygg app och Docker-image
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Hämta projektets källkod från GitHub.
+      - name: Hämta koden
+        uses: actions/checkout@v7
+
+      # 2. Installera Node.js. Samma huvudversion som i Dockerfilen (24).
+      #    cache: npm sparar npm-paketen mellan körningar så att installationen går snabbare.
+      - name: Installera Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # 3. Installera beroenden exakt enligt package-lock.json.
+      - name: Installera beroenden
+        run: npm ci
+
+      # 4. Kontrollera att applikationen kan byggas.
+      - name: Bygg applikationen
+        run: npm run build
+
+      # 5. Kontrollera att Docker-imagen kan byggas. Den publiceras inte någonstans,
+      #    Render bygger sin egen image från Dockerfilen.
+      - name: Bygg Docker-image
+        run: docker build -t cicd-render-app:ci .
+
+  deploy:
+    name: Starta driftsättning på Render
+    # Körs bara om build-jobbet lyckades. Misslyckas det stoppas hela flödet här.
+    needs: build
+    # Deploy sker bara från main, även vid manuell körning.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # 6. Anropa Renders deploy hook. Secreten skickas in som miljövariabel,
+      #    så att URL:en aldrig skrivs ut i loggen (GitHub maskerar den dessutom).
+      - name: Trigga deploy på Render
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK_URL" ]; then
+            echo "::error::Secreten RENDER_DEPLOY_HOOK_URL saknas. Lägg till den under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          # --fail gör att HTTP-fel (t.ex. 404 eller 500) ger felkod och stoppar jobbet.
+          # Inget -v, så att URL:en inte skrivs ut.
+          curl --fail --silent --show-error --max-time 30 -X POST "$DEPLOY_HOOK_URL" > /dev/null
+          echo "Deploy på Render startad."
