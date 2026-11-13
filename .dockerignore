@@ -1,0 +1,29 @@
+# Håller bygg-kontexten liten och ser till att inga hemligheter hamnar i imagen.
+
+# Beroenden och byggresultat skapas i Docker (npm ci / npm run build)
+node_modules
+.next
+out
+build
+
+# Versionshantering och CI
+.git
+.github
+.gitignore
+
+# Miljöfiler: kan innehålla hemligheter. Miljövariabler skickas in vid körning i stället.
+.env*
+
+# Arbetsfiler och dokumentation som inte behövs för att köra appen
+steglista.md
+STEGLISTA.md
+README.md
+AGENTS.md
+
+# Docker-filer och övrigt
+Dockerfile
+.dockerignore
+npm-debug.log*
+*.tsbuildinfo
+.DS_Store
+.vscode
