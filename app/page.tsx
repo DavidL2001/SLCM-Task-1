@@ -1,5 +1,5 @@
 // Ändra rubriken här (används i steg 7.1 för att testa hela CI/CD-kedjan).
-const HEADING = "TO DO-lista";
+const HEADING = "TO DO-lista (driftsatt via CI/CD)";
 
 export default function Home() {
   return (
