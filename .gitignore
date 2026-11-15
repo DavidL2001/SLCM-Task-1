@@ -40,9 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# arbetsfil (ska inte committas)
-STEGLISTA.md
-steglista.md
-
 # tillåt exempelfilen trots .env*
 !.env.example
